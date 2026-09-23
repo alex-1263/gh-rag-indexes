@@ -3,4 +3,5 @@
 # 或自助构建(fork + 自配 EMBED_API_KEY,产物留自己 fork,PR 只提 manifest 条目)
 repos = [
   "t8y2/dbx",
+  "langchain-ai/langchain",
 ]
