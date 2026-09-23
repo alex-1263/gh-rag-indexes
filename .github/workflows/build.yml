@@ -39,7 +39,10 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p ~/.gh-rag
-          cp repos.toml ~/.gh-rag/config.toml
+          # repos 清单 + 嵌入配置(节流放宽:构建机独立任务,TPM 内全速)
+          cat repos.toml > ~/.gh-rag/config.toml
+          printf '\n[embedding]\nprovider = "custom"\nbase_url = "%s"\nmodel = "%s"\nbatch_interval_ms = 300\n' \
+            "${GH_RAG_API_BASE}" "${GH_RAG_API_MODEL}" >> ~/.gh-rag/config.toml
           MODEL_TAG="${GH_RAG_API_MODEL:-default}"
           DATE_TAG=$(date +%Y-w%V)
           for repo in $(grep -oE '"[^"]+"' repos.toml | tr -d '"'); do
@@ -48,7 +51,6 @@ jobs:
             out="gh-rag-index-${slug}-${MODEL_TAG}-1024-${DATE_TAG}.sqlite"
             ./gh-rag export --skeleton -o "$out"
             gzip "$out"
-            echo "ASSET=${out}.gz" >> "$GITHUB_ENV"
           done
 
       - name: Publish Release
@@ -58,10 +60,10 @@ jobs:
           set -euo pipefail
           TAG="data-$(date +%Y-w%V)"
           gh release create "$TAG" gh-rag-index-*.sqlite.gz \
-            --title "索引 ${TAG}" --notes "骨架库(向量+元数据,无全文;fetch+sync 补全文)" || \
+            --title "索引 ${TAG}" --notes "骨架库(向量+元数据,无全文;gh-rag fetch 装载 + sync 补全文)" || \
             gh release upload "$TAG" gh-rag-index-*.sqlite.gz --clobber
-          # 保留策略:latest 指针 + 删除 >4 期
           gh release edit "$TAG" --latest
+          # 保留策略:latest + 最近 4 期,更早的删除
           KEEP=4
-          gh release list --limit 50 | awk '$1=="data-" {print $2}' | sort -r | tail -n +$((KEEP+1)) | \
-            while read t; do gh release delete "$t" -y; done
+          gh release list --limit 100 --json tagName --jq '.[].tagName' | grep '^data-' | sort -r | \
+            tail -n +$((KEEP+1)) | while read -r t; do gh release delete "$t" -y; done
