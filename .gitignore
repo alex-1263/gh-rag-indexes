@@ -1,0 +1,3 @@
+gh-rag-index-*.sqlite
+gh-rag-index-*.gz
+fetch-download.tmp

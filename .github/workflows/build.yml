@@ -1,0 +1,67 @@
+name: build
+# 骨架库构建与发布。两种触发:
+#  - schedule: 每周一 03:00 定时构建 repos.toml 全部仓库
+#  - workflow_dispatch: 手动(含 fork 自助构建:在自己 fork 配 EMBED_API_KEY 运行)
+# 产出规格(命名/骨架格式/校验)以本 workflow 为唯一权威。
+on:
+  schedule:
+    - cron: "0 3 * * 1"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+env:
+  GH_RAG_VERSION: v0.1.0 # 工具版本(升级时同步)
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+
+      # 工具:直接取 gh-rag Release 二进制(发布 workflow 的产物)
+      - name: Install gh-rag
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsSL -o gh-rag.tar.gz \
+            "https://github.com/alex-1263/github-rag/releases/download/${GH_RAG_VERSION}/gh-rag-${GH_RAG_VERSION}-x86_64-unknown-linux-gnu.tar.gz"
+          tar xzf gh-rag.tar.gz
+          chmod +x gh-rag gh-rag-mcp
+
+      - name: Build skeletons
+        env:
+          GH_RAG_API_KEY: ${{ secrets.EMBED_API_KEY }}
+          GH_RAG_API_BASE: ${{ vars.EMBED_BASE_URL }}
+          GH_RAG_API_MODEL: ${{ vars.EMBED_MODEL }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.gh-rag
+          cp repos.toml ~/.gh-rag/config.toml
+          MODEL_TAG="${GH_RAG_API_MODEL:-default}"
+          DATE_TAG=$(date +%Y-w%V)
+          for repo in $(grep -oE '"[^"]+"' repos.toml | tr -d '"'); do
+            slug=${repo/\//-}
+            ./gh-rag sync "$repo"
+            out="gh-rag-index-${slug}-${MODEL_TAG}-1024-${DATE_TAG}.sqlite"
+            ./gh-rag export --skeleton -o "$out"
+            gzip "$out"
+            echo "ASSET=${out}.gz" >> "$GITHUB_ENV"
+          done
+
+      - name: Publish Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          TAG="data-$(date +%Y-w%V)"
+          gh release create "$TAG" gh-rag-index-*.sqlite.gz \
+            --title "索引 ${TAG}" --notes "骨架库(向量+元数据,无全文;fetch+sync 补全文)" || \
+            gh release upload "$TAG" gh-rag-index-*.sqlite.gz --clobber
+          # 保留策略:latest 指针 + 删除 >4 期
+          gh release edit "$TAG" --latest
+          KEEP=4
+          gh release list --limit 50 | awk '$1=="data-" {print $2}' | sort -r | tail -n +$((KEEP+1)) | \
+            while read t; do gh release delete "$t" -y; done
