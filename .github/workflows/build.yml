@@ -46,7 +46,7 @@ jobs:
             "${GH_RAG_API_BASE}" "${GH_RAG_API_MODEL}" >> ~/.gh-rag/config.toml
           MODEL_TAG="${GH_RAG_API_MODEL:-default}"
           DATE_TAG=$(date +%Y-w%V)
-          for repo in $(grep -oE '"[^"]+"' repos.toml | tr -d '"'); do
+          for repo in $(sed 's/#.*//' repos.toml | grep -oE '"[^"]+"' | tr -d '"'); do
             slug=${repo/\//-}
             ./gh-rag sync "$repo"
             out="gh-rag-index-${slug}-${MODEL_TAG}-1024-${DATE_TAG}.sqlite"

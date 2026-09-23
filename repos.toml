@@ -1,5 +1,5 @@
 # gh-rag-indexes:可索引仓库清单
-# 贡献方式:开 PR 在 repos 数组加一行 "owner/repo"(自动构建/发布,上游不托管全文)
+# 贡献方式:开 PR 在 repos 数组加一行 owner/repo 即可(自动构建/发布,上游不托管全文)
 # 或自助构建(fork + 自配 EMBED_API_KEY,产物留自己 fork,PR 只提 manifest 条目)
 repos = [
   "t8y2/dbx",
