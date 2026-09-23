@@ -36,6 +36,7 @@ jobs:
           GH_RAG_API_KEY: ${{ secrets.EMBED_API_KEY }}
           GH_RAG_API_BASE: ${{ vars.EMBED_BASE_URL }}
           GH_RAG_API_MODEL: ${{ vars.EMBED_MODEL }}
+          GH_RAG_TOKEN: ${{ secrets.GITHUB_TOKEN }} # 拉 issue/评论需 GitHub token
         run: |
           set -euo pipefail
           mkdir -p ~/.gh-rag
