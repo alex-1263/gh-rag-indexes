@@ -12,7 +12,7 @@ permissions:
   contents: write
 
 env:
-  GH_RAG_VERSION: v0.2.0 # 工具版本(升级时同步)
+  GH_RAG_VERSION: v0.3.0 # 工具版本(升级时同步)
 
 jobs:
   build:
